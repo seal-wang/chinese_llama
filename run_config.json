@@ -1,0 +1,20 @@
+{
+    "model_name_or_path": "./llama_zh/model/",
+    "tokenizer_name": "./llama_zh/tokenizer/",
+    "train_file": "./data/zhwiki_00000.txt",
+    "per_device_train_batch_size": 1,
+    "do_train": true,
+    "output_dir": "./output/",
+    "cache_dir": "./cache_dir/",
+    "trust_remote_code": true,
+    "block_size": 512,
+    "overwrite_output_dir": true,
+    "num_train_epochs": 2,
+    "gradient_checkpointing": true,
+    "fp16": false,
+    "torch_dtype": "float16",
+    "max_grad_norm": 0,
+    "preprocessing_num_workers": 1,
+    "no_cuda": false
+}
+
