@@ -1,0 +1,24 @@
+{
+  "vocab_size": 64793,
+  "hidden_size": 512,
+  "intermediate_size": 512,
+  "num_hidden_layers": 26,
+  "num_attention_heads": 32,
+  "hidden_act": "silu",
+  "max_position_embeddings": 512,
+  "initializer_range": 0.02,
+  "rms_norm_eps": 1e-6,
+  "use_cache": false,
+  "bos_token_id": 1,
+  "eos_token_id": 2,
+  "pretraining_tp": 1,
+  "tie_word_embeddings": false,
+  "auto_map": {
+    "AutoConfig": "configuration_llama.LlamaConfig",
+    "AutoModelForCausalLM": "modeling_llama.LlamaForCausalLM"
+  },
+  "torch_dtype": "float16"
+}
+
+// no checkpoint
+// no deepspeed
