@@ -217,10 +217,10 @@ class DataTrainingArguments:
         if self.dataset_name is None and self.train_file is None and self.validation_file is None:
             raise ValueError("Need either a dataset name or a training/validation file.")
         else:
-            if self.train_file is not None:
+            if self.train_file is not None and os.path.isfile(self.train_file):
                 extension = self.train_file.split(".")[-1]
                 assert extension in ["csv", "json", "txt"], "`train_file` should be a csv, a json or a txt file."
-            if self.validation_file is not None:
+            if self.validation_file is not None and os.path.isfile(self.validation_file):
                 extension = self.validation_file.split(".")[-1]
                 assert extension in ["csv", "json", "txt"], "`validation_file` should be a csv, a json or a txt file."
 
@@ -324,13 +324,31 @@ def main():
         data_files = {}
         dataset_args = {}
         if data_args.train_file is not None:
-            data_files["train"] = data_args.train_file
+            if os.path.isdir(data_args.train_file):
+                data_files["train"] = [
+                    os.path.join(root, file)
+                    for root, dirs, files in os.walk(data_args.train_file)
+                    for file in files
+                ]
+                train_file = data_files["train"][0]
+            else:
+                data_files["train"] = data_args.train_file
+                train_file = data_args.train_file
         if data_args.validation_file is not None:
-            data_files["validation"] = data_args.validation_file
+            if os.path.isdir(data_args.validation_file):
+                data_files["validation"] = [
+                    os.path.join(root, file)
+                    for root, dirs, files in os.walk(data_args.validation_file)
+                    for file in files
+                ]
+                validation_file = data_files["validation"][0]
+            else:
+                data_files["validation"] = data_args.validation_file
+                validation_file = data_args.validation_file
         extension = (
-            data_args.train_file.split(".")[-1]
+            train_file.split(".")[-1]
             if data_args.train_file is not None
-            else data_args.validation_file.split(".")[-1]
+            else validation_file.split(".")[-1]
         )
         if extension == "txt":
             extension = "text"
