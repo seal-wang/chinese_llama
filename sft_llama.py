@@ -333,13 +333,13 @@ def main():
             cache_path = os.path.dirname(data_args.train_file if "train" == key else data_args.validation_file) + "/cache_path/"
             cache_dir = os.path.dirname(data_args.train_file if "train" == key else data_args.validation_file) + "/cache_dir/"
             for idx, file in enumerate(files):
-                file_cache_path = cache_path + file[len(data_args.train_file):].split(".")[:-1]
+                file_cache_path = cache_path + ''.join(file[len(data_args.train_file):].split(".")[:-1])
                 os.makedirs(file_cache_path, exist_ok=True)
                 try:
                     processed_dataset = datasets.load_from_disk(file_cache_path, keep_in_memory=False)
                     logger.info(f'training datasets-{file} has been loaded from disk')
                 except Exception:
-                    file_cache_dir = cache_dir + file[len(data_args.train_file):].split(".")[:-1] + "_text"
+                    file_cache_dir = cache_dir + ''.join(file[len(data_args.train_file):].split(".")[:-1]) + "_text"
                     os.makedirs(file_cache_dir, exist_ok=True)
                     raw_dataset = load_dataset("text", data_files=file, cache_dir=file_cache_dir, keep_in_memory=False)
                     logger.info(f"{file} has been loaded")
