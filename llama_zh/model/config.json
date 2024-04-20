@@ -1,9 +1,9 @@
 {
   "vocab_size": 64793,
-  "hidden_size": 512,
-  "intermediate_size": 512,
-  "num_hidden_layers": 68,
-  "num_attention_heads": 32,
+  "hidden_size": 768,
+  "intermediate_size": 1668,
+  "num_hidden_layers": 6,
+  "num_attention_heads": 8,
   "hidden_act": "silu",
   "max_position_embeddings": 512,
   "initializer_range": 0.02,
