@@ -1,0 +1,24 @@
+{
+    "files.autoSave": "afterDelay",
+    "workbench.editor.enablePreview": false,
+    "security.allowedUNCHosts": [
+        "192.168.56.101"
+    ],
+    "remote.SSH.remotePlatform": {
+        "192.168.56.100": "linux"
+    },
+    "python.autoComplete.extraPaths": [  
+        "${userHome}/.local/lib/python3.8/site-packages/aaa",
+        "${userHome}/mybin/miniconda3/envs/env_py3_10/lib/python3.10/site-packages/",
+        "${userHome}/local_bin/miniconda3/envs/env_py310/lib/python3.10/site-packages/"
+    ],
+    "python.analysis.extraPaths": [
+        "${userHome}/.local/lib/python3.8/site-packages/aaa",
+        "${userHome}/local_bin/miniconda3/envs/env_py310/lib/python3.10/site-packages/"
+    ],
+    "remote.autoForwardPortsSource": "hybrid",
+    "terminal.integrated.rightClickBehavior": "default",
+    "files.associations": {
+        "*.md": "bibtex"
+    }
+}

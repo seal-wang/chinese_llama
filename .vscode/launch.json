@@ -1,0 +1,22 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "python": "${userHome}/local_bin/miniconda3/envs/env_py310/bin/python3",
+            "name": "python_debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "test.py",
+            "console": "integratedTerminal",
+            "args": ["run_config.json"],
+            "env": {
+                "PYTHONPATH": "${userHome}/local_bin/miniconda3/envs/env_py310/lib/python3.10/site-packages/",
+                "PATH": "${userHome}/local_bin/miniconda3/envs/env_py310/bin:${env:PATH}"
+            },
+            "justMyCode": false
+        }
+    ]
+}
