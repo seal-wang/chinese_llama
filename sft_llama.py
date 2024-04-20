@@ -294,36 +294,10 @@ def main():
     #
     # In distributed training, the load_dataset function guarantee that only one local process can concurrently
     # download the dataset.
-    if data_args.dataset_name is not None:
-        # Downloading and loading a dataset from the hub.
-        raw_datasets = load_dataset(
-            data_args.dataset_name,
-            data_args.dataset_config_name,
-            cache_dir=model_args.cache_dir,
-            use_auth_token=True if model_args.use_auth_token else None,
-            streaming=data_args.streaming,
-        )
-        if "validation" not in raw_datasets.keys():
-            raw_datasets["validation"] = load_dataset(
-                data_args.dataset_name,
-                data_args.dataset_config_name,
-                split=f"train[:{data_args.validation_split_percentage}%]",
-                cache_dir=model_args.cache_dir,
-                use_auth_token=True if model_args.use_auth_token else None,
-                streaming=data_args.streaming,
-            )
-            raw_datasets["train"] = load_dataset(
-                data_args.dataset_name,
-                data_args.dataset_config_name,
-                split=f"train[{data_args.validation_split_percentage}%:]",
-                cache_dir=model_args.cache_dir,
-                use_auth_token=True if model_args.use_auth_token else None,
-                streaming=data_args.streaming,
-            )
-    else:
+    with training_args.main_process_first(desc="dataset map tokenization and grouping"):
         data_files = {}
         dataset_args = {}
-        if data_args.train_file is not None:
+        if data_args.train_file is not None and training_args.do_train:
             if os.path.isdir(data_args.train_file):
                 data_files["train"] = [
                     os.path.join(root, file)
@@ -334,7 +308,7 @@ def main():
             else:
                 data_files["train"] = data_args.train_file
                 train_file = data_args.train_file
-        if data_args.validation_file is not None:
+        if data_args.validation_file is not None and training_args.do_eval:
             if os.path.isdir(data_args.validation_file):
                 data_files["validation"] = [
                     os.path.join(root, file)
@@ -353,31 +327,69 @@ def main():
         if extension == "txt":
             extension = "text"
             dataset_args["keep_linebreaks"] = data_args.keep_linebreaks
-        raw_datasets = load_dataset(
-            extension,
-            data_files=data_files,
-            cache_dir=model_args.cache_dir,
-            use_auth_token=True if model_args.use_auth_token else None,
-            **dataset_args,
-        )
-        # If no validation data is there, validation_split_percentage will be used to divide the dataset.
-        if "validation" not in raw_datasets.keys():
-            raw_datasets["validation"] = load_dataset(
-                extension,
-                data_files=data_files,
-                split=f"train[:{data_args.validation_split_percentage}%]",
-                cache_dir=model_args.cache_dir,
-                use_auth_token=True if model_args.use_auth_token else None,
-                **dataset_args,
-            )
-            raw_datasets["train"] = load_dataset(
-                extension,
-                data_files=data_files,
-                split=f"train[{data_args.validation_split_percentage}%:]",
-                cache_dir=model_args.cache_dir,
-                use_auth_token=True if model_args.use_auth_token else None,
-                **dataset_args,
-            )
+
+        lm_datasets = []
+        for key, files in data_files.items():
+            cache_path = os.path.dirname(data_args.train_file if "train" == key else data_args.validation_file) + "/cache_path/"
+            cache_dir = os.path.dirname(data_args.train_file if "train" == key else data_args.validation_file) + "/cache_dir/"
+            for idx, file in enumerate(files):
+                file_cache_path = cache_path + ''.join(file[len(data_args.train_file):].split(".")[:-1])
+                os.makedirs(file_cache_path, exist_ok=True)
+                try:
+                    processed_dataset = datasets.load_from_disk(file_cache_path, keep_in_memory=False)
+                    logger.info(f'training datasets-{file} has been loaded from disk')
+                except Exception:
+                    file_cache_dir = cache_dir + ''.join(file[len(data_args.train_file):].split(".")[:-1]) + "_text"
+                    os.makedirs(file_cache_dir, exist_ok=True)
+                    raw_dataset = load_dataset("text", data_files=file, cache_dir=file_cache_dir, keep_in_memory=False)
+                    logger.info(f"{file} has been loaded")
+                    tokenized_dataset = raw_dataset.map(
+                        tokenize_function,
+                        batched=True,
+                        num_proc=data_args.preprocessing_num_workers,
+                        remove_columns="text",
+                        load_from_cache_file=True,
+                        keep_in_memory=False,
+                        cache_file_names = {k: os.path.join(file_cache_dir, 'tokenized.arrow') for k in raw_dataset},
+                        desc="Running tokenizer on dataset",
+                    )
+                    grouped_datasets = tokenized_dataset.map(
+                        group_texts,
+                        batched=True,
+                        num_proc=data_args.preprocessing_num_workers,
+                        load_from_cache_file=True,
+                        keep_in_memory=False,
+                        cache_file_names = {k: os.path.join(file_cache_dir, 'grouped.arrow') for k in tokenized_dataset},
+                        desc=f"Grouping texts in chunks of {block_size}",
+                    )
+                    processed_dataset = grouped_datasets
+                    processed_dataset.save_to_disk(file_cache_path)
+                if idx == 0:
+                    lm_datasets = processed_dataset['train']
+                else:
+                    assert lm_datasets.features.type == processed_dataset["train"].features.type
+                    lm_datasets = concatenate_datasets([lm_datasets, processed_dataset["train"]])
+
+        if training_args.do_eval and data_args.validation_file is None:
+            lm_datasets = lm_datasets.train_test_split(test_size = data_args.validation_split_percentage)
+       
+    if training_args.do_train:
+        train_dataset = lm_datasets['train']
+        if data_args.max_train_samples is not None:
+            max_train_samples = min(len(train_dataset), data_args.max_train_samples)
+            train_dataset = train_dataset.select(range(max_train_samples))
+        logger.info(f"Num train_samples  {len(train_dataset)}")
+        logger.info("training example:")
+        logger.info(tokenizer.decode(train_dataset[0]['input_ids']))
+    if training_args.do_eval:
+        eval_dataset = lm_datasets["test"]
+        if data_args.max_eval_samples is not None:
+            max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
+            eval_dataset = eval_dataset.select(range(max_eval_samples))
+        logger.info(f"Num eval_samples  {len(eval_dataset)}")
+        logger.info("training example:")
+        logger.info(tokenizer.decode(eval_dataset[0]['input_ids']))
+
 
     # See more about loading any type of standard or custom dataset (from files, python dict, pandas DataFrame, etc) at
     # https://huggingface.co/docs/datasets/loading_datasets.html.
@@ -429,18 +441,16 @@ def main():
             if model_args.torch_dtype in ["auto", None]
             else getattr(torch, model_args.torch_dtype)
         )
-        from llama_zh.model.modeling_llama import LlamaForCausalLM
-        model = LlamaForCausalLM(config=config)
-        # model = AutoModelForCausalLM.from_pretrained(
-        #     model_args.model_name_or_path,
-        #     from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        #     config=config,
-        #     cache_dir=model_args.cache_dir,
-        #     revision=model_args.model_revision,
-        #     use_auth_token=True if model_args.use_auth_token else None,
-        #     torch_dtype=torch_dtype,
-        #     low_cpu_mem_usage=model_args.low_cpu_mem_usage,
-        # )
+        model = AutoModelForCausalLM.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None,
+            torch_dtype=torch_dtype,
+            low_cpu_mem_usage=model_args.low_cpu_mem_usage,
+        )
     else:
         model = AutoModelForCausalLM.from_config(config)
         n_params = sum({p.data_ptr(): p.numel() for p in model.parameters()}.values())
@@ -449,17 +459,8 @@ def main():
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.
     embedding_size = model.get_input_embeddings().weight.shape[0]
-    tokenizer_len = len(tokenizer)
     if len(tokenizer) > embedding_size:
         model.resize_token_embeddings(len(tokenizer))
-
-    # Preprocessing the datasets.
-    # First we tokenize all the texts.
-    if training_args.do_train:
-        column_names = list(raw_datasets["train"].features)
-    else:
-        column_names = list(raw_datasets["validation"].features)
-    text_column_name = "text" if "text" in column_names else column_names[0]
 
     # since this will be pickled to avoid _LazyModule error in Hasher force logger loading before tokenize_function
     tok_logger = transformers.utils.logging.get_logger("transformers.tokenization_utils_base")
@@ -474,23 +475,6 @@ def main():
                 " before being passed to the model."
             )
         return output
-
-    with training_args.main_process_first(desc="dataset map tokenization"):
-        if not data_args.streaming:
-            tokenized_datasets = raw_datasets.map(
-                tokenize_function,
-                batched=True,
-                num_proc=data_args.preprocessing_num_workers,
-                remove_columns=column_names,
-                load_from_cache_file=not data_args.overwrite_cache,
-                desc="Running tokenizer on dataset",
-            )
-        else:
-            tokenized_datasets = raw_datasets.map(
-                tokenize_function,
-                batched=True,
-                remove_columns=column_names,
-            )
 
     if data_args.block_size is None:
         block_size = tokenizer.model_max_length
@@ -533,36 +517,6 @@ def main():
     # https://huggingface.co/docs/datasets/package_reference/main_classes.html#datasets.Dataset.map
 
     with training_args.main_process_first(desc="grouping texts together"):
-        if not data_args.streaming:
-            lm_datasets = tokenized_datasets.map(
-                group_texts,
-                batched=True,
-                num_proc=data_args.preprocessing_num_workers,
-                load_from_cache_file=not data_args.overwrite_cache,
-                desc=f"Grouping texts in chunks of {block_size}",
-            )
-        else:
-            lm_datasets = tokenized_datasets.map(
-                group_texts,
-                batched=True,
-            )
-
-    if training_args.do_train:
-        if "train" not in tokenized_datasets:
-            raise ValueError("--do_train requires a train dataset")
-        train_dataset = lm_datasets["train"]
-        if data_args.max_train_samples is not None:
-            max_train_samples = min(len(train_dataset), data_args.max_train_samples)
-            train_dataset = train_dataset.select(range(max_train_samples))
-
-    if training_args.do_eval:
-        if "validation" not in tokenized_datasets:
-            raise ValueError("--do_eval requires a validation dataset")
-        eval_dataset = lm_datasets["validation"]
-        if data_args.max_eval_samples is not None:
-            max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
-            eval_dataset = eval_dataset.select(range(max_eval_samples))
-
         def preprocess_logits_for_metrics(logits, labels):
             if isinstance(logits, tuple):
                 # Depending on the model and config, logits may contain extra tensors,
