@@ -1,33 +1,40 @@
 #!/usr/bin/env python3
 import os
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"]="python"
-from tokenization_llama_zh import LlamaZHTokenizer
 from sentencepiece import sentencepiece_model_pb2 as sp_pb2_model
 import sentencepiece as spm
-
-
-old_sp_model_file = "./ice_text.model"
-new_sp_model_file = "./new.model"
-
-old_sp_model = spm.SentencePieceProcessor()
-old_sp_model.Load(old_sp_model_file)
-old_spm = sp_pb2_model.ModelProto()
-old_spm.ParseFromString(old_sp_model.serialized_model_proto())
-new_spm = sp_pb2_model.ModelProto()
+import argparse
 
 def is_retain(index, piece):
-    if index == 0 or index > 300:
-        return True
-    return False
+        if index <= 0xFCFC:
+            return True
+        return False
 
-for i, piece in enumerate(old_spm.pieces):
-    if is_retain(i, piece):
-        new_spm.pieces.append(piece)
+def edit_tok_model(input_file, output_file):
+    assert os.path.isfile(input_file)
 
-with open(new_sp_model_file, 'wb') as f:
-    f.write(new_spm.SerializeToString())
+    old_sp_model = spm.SentencePieceProcessor()
+    old_sp_model.Load(input_file)
+    old_spm = sp_pb2_model.ModelProto()
+    old_spm.ParseFromString(old_sp_model.serialized_model_proto())
+    new_spm = sp_pb2_model.ModelProto()
 
-tokenizer = LlamaZHTokenizer(vocab_file=new_sp_model_file)
-tokenizer.save_pretrained("./new_model/")
+    for i, piece in enumerate(old_spm.pieces):
+        if is_retain(i, piece):
+            new_spm.pieces.append(piece)
 
-os.remove(new_sp_model_file)
+    new_str = new_spm.SerializeToString() + old_spm.SerializeToString()[-242:]
+    with open(output_file, 'wb') as f:
+        f.write(new_str)
+
+def parse_args():
+    parser = argparse.ArgumentParser(description = 'pack hot update res')
+    parser.add_argument('-i', '--input_file', type = str, required = True, metavar = '', help = 'input file')
+    parser.add_argument('-o', '--output_file', type = str, required = True, metavar = '', help = 'output file')
+    args = parser.parse_args()
+
+    return args
+
+if __name__ == "__main__":
+    args = parse_args()
+    edit_tok_model(args.input_file, args.output_file)
