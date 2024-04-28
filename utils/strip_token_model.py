@@ -10,12 +10,6 @@ import json
 import re
 
 opencc = OpenCC('t2s')
-
-full_tokens = []
-new_tokens = []
-stripped_tokens = []
-piece_list = []
-
 start_en_pattern = re.compile(r"[^a-zA-Z]")
 
 #C0 Controls and Basic Latin: 0000–007F
@@ -111,7 +105,7 @@ def is_including_low_freq_en(piece):
         s = s.lower()
         if s in en_pieces and s not in added_en_pieces:
             added_en_pieces.append(s.lower())
-            piece.piece = s
+            piece.piece = piece.piece.lower()
             return False
         else:
             return True
@@ -123,14 +117,11 @@ def is_retain(index, piece):
     if is_including_ko(p) or is_including_ja(p)\
     or is_including_cl(p)\
     or is_including_tra(p) or is_including_low_freq_en(piece):
-        stripped_tokens.append(get_token_dict(index, piece))
         return False
 
-    new_tokens.append(get_token_dict(index, piece))
     return True
 
 def edit_tok_model(input_file, output_file, add_file):
-    global piece_list
     global en_pieces
     assert os.path.isfile(input_file)
 
@@ -142,31 +133,13 @@ def edit_tok_model(input_file, output_file, add_file):
     old_spm.ParseFromString(old_sp_model.serialized_model_proto())
     new_spm = sp_pb2_model.ModelProto()
 
-    piece_list = [piece.piece for piece in old_spm.pieces]
     for i, piece in enumerate(old_spm.pieces):
-        full_tokens.append(get_token_dict(i, piece))
         if is_retain(i, piece):
             new_spm.pieces.append(piece)
 
     new_str = new_spm.SerializeToString() + old_spm.SerializeToString()[-242:]
     with open(output_file, mode='wb') as f:
         f.write(new_str)
-
-    path = os.path.dirname(output_file)
-    token_num = len(full_tokens)
-    full_tokens.insert(0, {"num": token_num})
-    with open(path + "/old_vocabulary.json", mode='w', encoding="utf-8") as f:
-        json.dump(full_tokens, f, sort_keys=True, indent=4, separators=(',', ':'))
-
-    token_num = len(new_tokens)
-    new_tokens.insert(0, {"num": token_num})
-    with open(path + "/new_vocabulary.json", mode='w', encoding="utf-8") as f:
-        json.dump(new_tokens, f, sort_keys=True, indent=4, separators=(',', ':'))
-
-    token_num = len(stripped_tokens)
-    stripped_tokens.insert(0, {"num": token_num})
-    with open(path + "/stripped_vocabulary.json", mode='w', encoding="utf-8") as f:
-        json.dump(stripped_tokens, f, sort_keys=True, indent=4, separators=(',', ':'))
 
 def parse_args():
     parser = argparse.ArgumentParser(description = 'pack hot update res')
@@ -177,20 +150,24 @@ def parse_args():
 
     return args
 
-def dump_model(file):
-    old_sp_model = spm.SentencePieceProcessor()
-    old_sp_model.Load(file)
-    old_spm = sp_pb2_model.ModelProto()
-    old_spm.ParseFromString(old_sp_model.serialized_model_proto())
+def dump_model(input_file, output_file):
+    path = os.path.dirname(output_file)
+    name_list = ["/old_vocabulary.json", "/new_vocabulary.json"]
+    for i, file in enumerate([input_file, output_file]):
+        sp_proc = spm.SentencePieceProcessor()
+        sp_proc.Load(file)
+        sp_model = sp_pb2_model.ModelProto()
+        sp_model.ParseFromString(sp_proc.serialized_model_proto())
 
-    s = ""
-    for i, piece in enumerate(old_spm.pieces):
-        s += f"{i:04X}\t{piece.piece}\t\t\t{piece.score}\t{piece.type}\n"
-
-    with open("./out_dir/new_sen_full.txt", mode="w", encoding="utf-8") as f:
-        f.write(s)
+        piece_list = []
+        for id, piece in enumerate(sp_model.pieces):
+            piece_list.append(get_token_dict(id, piece))
+        piece_num = len(piece_list)
+        piece_list.insert(0, {"num": piece_num})
+        with open(path + name_list[i], mode='w', encoding="utf-8") as f:
+            json.dump(piece_list, f, sort_keys=True, indent=4, separators=(',', ':'), ensure_ascii=False)
 
 if __name__ == "__main__":
     args = parse_args()
     edit_tok_model(args.input_file, args.output_file, args.add_file)
-    dump_model(args.output_file)
+    dump_model(args.input_file, args.output_file)
