@@ -12,20 +12,74 @@ import re
 opencc = OpenCC('t2s')
 start_en_pattern = re.compile(r"[^a-zA-Z]")
 
-#C0 Controls and Basic Latin: 0000–007F
-#C1 Controls and Latin-1 Supplement：0080–00FF
-#Latin Extended-A:0100–017F
-#Latin Extended-B:0180–024F
-#Latin Extended-C:2C60–2C7F
-#Latin Extended-D:A720–A7FF
-#Latin Extended Additional: 1E00–1EFF
-#韩文拼音(Hangul Syllables)：AC00-D7AF
-#韩文字母：1100-11FF
-#韩文兼容字母:3130-318F
-#日文平假名:3040-309F
-#日文片假名:30A0-30FF
-#日文片假名拼音扩展:31F0-31FF
-#Cyrillic:0400–04FF
+strip_list = [
+    [0x0080, 0x00FF],
+    [0x0100, 0x017F],
+    [0x0180, 0x024F],
+    [0x0250, 0x02AF],
+    [0x02B0, 0x02FF],
+    [0x0300, 0x036F],
+    [0x0370, 0x03FF],
+    [0x0400, 0x04FF],
+    [0x0530, 0x058F],
+    [0x0590, 0x05FF],
+    [0x0600, 0x06FF],
+    [0x0700, 0x074F],
+	[0x07C0, 0x07FF],
+    [0x0900, 0x097F],
+    [0x0980, 0x09FF],
+    [0x0A00, 0x0A7F],
+	[0x0A80, 0x0AFF],
+    [0x0B80, 0x0BFF],
+    [0x0C00, 0x0C7F],
+	[0x0C80, 0x0CFF],
+	[0x0D00, 0x0D7F],
+	[0x0D80, 0x0DFF],
+    [0x0E00, 0x0E7F],
+	[0x0F00, 0x0FFF],
+    [0x1000, 0x109F],
+    [0x10A0, 0x10FF],
+    [0x1100, 0x11FF],
+    [0x1780, 0x17FF],
+    [0x1D00, 0x1D7F],
+    [0x1E00, 0x1EFF],
+    [0x1F00, 0x1FFF],
+    [0x2000, 0x2011], [0x2020, 0x2021], [0x2027, 0x202F], [0x203B, 0x206F],
+    [0x2070, 0x209F],
+    [0x20A0, 0x20CF],
+    [0x20D0, 0x20FF],
+    [0x2190, 0x21FF],
+    [0x2300, 0x23FF],
+    [0x2500, 0x257F],
+    [0x2580, 0x259F],
+    [0x25A0, 0x25FF],
+    [0x2600, 0x26FF],
+    [0x2700, 0x27BF],
+    [0x27C0, 0x27EF],
+	[0x27F0, 0x27FF],
+	[0x2800, 0x28FF],
+	[0x2900, 0x297F],
+    [0x2B00, 0x2BFF],
+    [0x2D30, 0x2D7F],
+    [0x2E00, 0x2E7F],
+    [0x2F00, 0x2FDF],
+    [0x3004, 0x3007], [0x300E, 0x301B], [0x3020, 0x303F],
+    [0x3040, 0x309F],
+    [0x30A0, 0x30FF],
+    [0x3100, 0x312F],
+    [0x3130, 0x318F],
+    [0x31F0, 0x31FF],
+	[0xA490, 0xA4CF],
+    [0xAC00, 0xD7AF],
+    [0xE000, 0xF8FF],
+    [0xF900, 0xFAFF],
+    [0xFB00, 0xFB4F],
+    [0xFE00, 0xFE0F],
+    [0xFE30, 0xFE4F],
+    [0xFE50, 0xFE6F],
+    [0xFE70, 0xFEFF],
+    [0xFFF0, 0xFFFF]    
+]
 
 en_pieces = []
 added_en_pieces = []
@@ -46,48 +100,6 @@ def init_en_pieces(file):
         with open(file, mode="r", encoding="utf-8") as f:
             content = f.read()
             en_pieces = content.split("\n")
-
-def is_including_ko(s):
-    for v in s:
-        unicode_id = ord(v)
-        if (0x1100 <= unicode_id and 0x11FF >= unicode_id) \
-            or (0x3130 <= unicode_id and 0x318F >= unicode_id) \
-            or (0xAC00 <= unicode_id and 0xD7AF >= unicode_id):
-            return True
-    
-    return False
-
-def is_including_ja(s):
-    for v in s:
-        unicode_id = ord(v)
-        if (0x3040 <= unicode_id and 0x309F >= unicode_id) \
-            or (0x30A0 <= unicode_id and 0x30FF >= unicode_id) \
-            or (0x31F0 <= unicode_id and 0x31FF >= unicode_id):
-            return True
-    
-    return False
-
-def is_including_latin(s):
-    for v in s:
-        unicode_id = ord(v)
-        if (0x000 <= unicode_id and 0x0020 >= unicode_id) \
-            or (0x0080 <= unicode_id and 0x000F >= unicode_id) \
-            or (0x0100 <= unicode_id and 0x017F >= unicode_id) \
-            or (0x0180 <= unicode_id and 0x024F >= unicode_id) \
-            or (0x2C60 <= unicode_id and 0x2C7F >= unicode_id) \
-            or (0xA720 <= unicode_id and 0xA7FF >= unicode_id) \
-            or (0x1E00 <= unicode_id and 0x1EFF >= unicode_id):
-            return True
-    
-    return False
-
-def is_including_cl(s):
-    for v in s:
-        unicode_id = ord(v)
-        if (0x0400 <= unicode_id and 0x04FF >= unicode_id):
-            return True
-    
-    return False
 
 def is_including_tra(s):
     if s != opencc.convert(s):
@@ -112,11 +124,21 @@ def is_including_low_freq_en(piece):
 
     return False
 
+def is_including_sp(s):
+    for ch in s:
+        index = ord(ch)
+        if index == 0x2581:
+            continue
+        for t in strip_list:
+            if t[0] <= index and index <= t[1]:
+                return True
+    
+    return False
+
 def is_retain(index, piece):
     p = piece.piece
-    if is_including_ko(p) or is_including_ja(p)\
-    or is_including_cl(p)\
-    or is_including_tra(p) or is_including_low_freq_en(piece):
+    if is_including_sp(p) or is_including_tra(p)\
+    or is_including_low_freq_en(piece):
         return False
 
     return True
