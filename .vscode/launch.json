@@ -9,9 +9,22 @@
             "name": "python_debug",
             "type": "debugpy",
             "request": "launch",
-            "program": "test.py",
+            "program": "sft_llama.py",
             "console": "integratedTerminal",
             "args": ["run_config.json"],
+            "env": {
+                "PYTHONPATH": "${userHome}/local_bin/miniconda3/envs/env_py310/lib/python3.10/site-packages/",
+                "PATH": "${userHome}/local_bin/miniconda3/envs/env_py310/bin:${env:PATH}"
+            },
+            "justMyCode": false
+        },
+        {
+            "python": "${userHome}/local_bin/miniconda3/envs/env_py310/bin/python3",
+            "name": "generate_debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "generate.py",
+            "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${userHome}/local_bin/miniconda3/envs/env_py310/lib/python3.10/site-packages/",
                 "PATH": "${userHome}/local_bin/miniconda3/envs/env_py310/bin:${env:PATH}"

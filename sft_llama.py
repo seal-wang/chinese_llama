@@ -33,6 +33,7 @@ import datasets
 import evaluate
 import torch
 from datasets import load_dataset
+from build_dataset import build_instruction_dataset, DataCollatorForSupervisedDataset
 
 import transformers
 from transformers import (
@@ -285,112 +286,6 @@ def main():
     # Set seed before initializing model.
     set_seed(training_args.seed)
 
-    # Get the datasets: you can either provide your own CSV/JSON/TXT training and evaluation files (see below)
-    # or just provide the name of one of the public datasets available on the hub at https://huggingface.co/datasets/
-    # (the dataset will be downloaded automatically from the datasets Hub).
-    #
-    # For CSV/JSON files, this script will use the column called 'text' or the first column if no column called
-    # 'text' is found. You can easily tweak this behavior (see below).
-    #
-    # In distributed training, the load_dataset function guarantee that only one local process can concurrently
-    # download the dataset.
-    with training_args.main_process_first(desc="dataset map tokenization and grouping"):
-        data_files = {}
-        dataset_args = {}
-        if data_args.train_file is not None and training_args.do_train:
-            if os.path.isdir(data_args.train_file):
-                data_files["train"] = [
-                    os.path.join(root, file)
-                    for root, dirs, files in os.walk(data_args.train_file)
-                    for file in files
-                ]
-                train_file = data_files["train"][0]
-            else:
-                data_files["train"] = data_args.train_file
-                train_file = data_args.train_file
-        if data_args.validation_file is not None and training_args.do_eval:
-            if os.path.isdir(data_args.validation_file):
-                data_files["validation"] = [
-                    os.path.join(root, file)
-                    for root, dirs, files in os.walk(data_args.validation_file)
-                    for file in files
-                ]
-                validation_file = data_files["validation"][0]
-            else:
-                data_files["validation"] = data_args.validation_file
-                validation_file = data_args.validation_file
-        extension = (
-            train_file.split(".")[-1]
-            if data_args.train_file is not None
-            else validation_file.split(".")[-1]
-        )
-        if extension == "txt":
-            extension = "text"
-            dataset_args["keep_linebreaks"] = data_args.keep_linebreaks
-
-        lm_datasets = []
-        for key, files in data_files.items():
-            cache_path = os.path.dirname(data_args.train_file if "train" == key else data_args.validation_file) + "/cache_path/"
-            cache_dir = os.path.dirname(data_args.train_file if "train" == key else data_args.validation_file) + "/cache_dir/"
-            for idx, file in enumerate(files):
-                file_cache_path = cache_path + ''.join(file[len(data_args.train_file):].split(".")[:-1])
-                os.makedirs(file_cache_path, exist_ok=True)
-                try:
-                    processed_dataset = datasets.load_from_disk(file_cache_path, keep_in_memory=False)
-                    logger.info(f'training datasets-{file} has been loaded from disk')
-                except Exception:
-                    file_cache_dir = cache_dir + ''.join(file[len(data_args.train_file):].split(".")[:-1]) + "_text"
-                    os.makedirs(file_cache_dir, exist_ok=True)
-                    raw_dataset = load_dataset("text", data_files=file, cache_dir=file_cache_dir, keep_in_memory=False)
-                    logger.info(f"{file} has been loaded")
-                    tokenized_dataset = raw_dataset.map(
-                        tokenize_function,
-                        batched=True,
-                        num_proc=data_args.preprocessing_num_workers,
-                        remove_columns="text",
-                        load_from_cache_file=True,
-                        keep_in_memory=False,
-                        cache_file_names = {k: os.path.join(file_cache_dir, 'tokenized.arrow') for k in raw_dataset},
-                        desc="Running tokenizer on dataset",
-                    )
-                    grouped_datasets = tokenized_dataset.map(
-                        group_texts,
-                        batched=True,
-                        num_proc=data_args.preprocessing_num_workers,
-                        load_from_cache_file=True,
-                        keep_in_memory=False,
-                        cache_file_names = {k: os.path.join(file_cache_dir, 'grouped.arrow') for k in tokenized_dataset},
-                        desc=f"Grouping texts in chunks of {block_size}",
-                    )
-                    processed_dataset = grouped_datasets
-                    processed_dataset.save_to_disk(file_cache_path)
-                if idx == 0:
-                    lm_datasets = processed_dataset['train']
-                else:
-                    assert lm_datasets.features.type == processed_dataset["train"].features.type
-                    lm_datasets = concatenate_datasets([lm_datasets, processed_dataset["train"]])
-
-        if training_args.do_eval and data_args.validation_file is None:
-            lm_datasets = lm_datasets.train_test_split(test_size = data_args.validation_split_percentage)
-       
-    if training_args.do_train:
-        train_dataset = lm_datasets['train']
-        if data_args.max_train_samples is not None:
-            max_train_samples = min(len(train_dataset), data_args.max_train_samples)
-            train_dataset = train_dataset.select(range(max_train_samples))
-        logger.info(f"Num train_samples  {len(train_dataset)}")
-        logger.info("training example:")
-        logger.info(tokenizer.decode(train_dataset[0]['input_ids']))
-    if training_args.do_eval:
-        eval_dataset = lm_datasets["test"]
-        if data_args.max_eval_samples is not None:
-            max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
-            eval_dataset = eval_dataset.select(range(max_eval_samples))
-        logger.info(f"Num eval_samples  {len(eval_dataset)}")
-        logger.info("training example:")
-        logger.info(tokenizer.decode(eval_dataset[0]['input_ids']))
-
-
     # See more about loading any type of standard or custom dataset (from files, python dict, pandas DataFrame, etc) at
     # https://huggingface.co/docs/datasets/loading_datasets.html.
 
@@ -435,21 +330,98 @@ def main():
             "You can do it from another script, save it, and load it from here, using --tokenizer_name."
         )
 
+    # Get the datasets: you can either provide your own CSV/JSON/TXT training and evaluation files (see below)
+    # or just provide the name of one of the public datasets available on the hub at https://huggingface.co/datasets/
+    # (the dataset will be downloaded automatically from the datasets Hub).
+    #
+    # For CSV/JSON files, this script will use the column called 'text' or the first column if no column called
+    # 'text' is found. You can easily tweak this behavior (see below).
+    #
+    # In distributed training, the load_dataset function guarantee that only one local process can concurrently
+    # download the dataset.
+    data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
+    eval_dataset=None
+    train_dataset = None
+    data_files = {}
+    dataset_args = {}
+    if data_args.train_file is not None:
+        if os.path.isdir(data_args.train_file):
+            data_files["train"] = [
+                os.path.join(root, file)
+                for root, dirs, files in os.walk(data_args.train_file)
+                for file in files
+            ]
+            train_file = data_files["train"][0]
+        else:
+            data_files["train"] = data_args.train_file
+            train_file = data_args.train_file
+    if data_args.validation_file is not None:
+        if os.path.isdir(data_args.validation_file):
+            data_files["validation"] = [
+                os.path.join(root, file)
+                for root, dirs, files in os.walk(data_args.validation_file)
+                for file in files
+            ]
+            validation_file = data_files["validation"][0]
+        else:
+            data_files["validation"] = data_args.validation_file
+            validation_file = data_args.validation_file
+    extension = (
+        train_file.split(".")[-1]
+        if data_args.train_file is not None
+        else validation_file.split(".")[-1]
+    )
+    if extension == "txt":
+        extension = "text"
+        dataset_args["keep_linebreaks"] = data_args.keep_linebreaks
+        
+    if training_args.do_train:
+        with training_args.main_process_first(desc="loading and tokenization"):
+            files = data_files["train"]
+            logger.info(f"Training files: {' '.join(files)}")
+            train_dataset = build_instruction_dataset(
+                data_path=files,
+                tokenizer=tokenizer,
+                max_seq_length=data_args.block_size,
+                data_cache_dir = None,
+                preprocessing_num_workers = data_args.preprocessing_num_workers)
+        logger.info(f"Num train_samples  {len(train_dataset)}")
+        logger.info("Training example:")
+        logger.info(tokenizer.decode(train_dataset[0]['input_ids']))
+    if training_args.do_eval:
+        with training_args.main_process_first(desc="loading and tokenization"):
+            files = data_files["validation"]
+            logger.info(f"Evaluation files: {' '.join(files)}")
+            eval_dataset = build_instruction_dataset(
+                data_path=files,
+                tokenizer=tokenizer,
+                max_seq_length=data_args.block_size,
+                data_cache_dir = None,
+                preprocessing_num_workers = data_args.preprocessing_num_workers)
+        logger.info(f"Num eval_samples  {len(eval_dataset)}")
+        logger.info("Evaluation example:")
+        logger.info(tokenizer.decode(eval_dataset[0]['input_ids']))
+
     if model_args.model_name_or_path:
         torch_dtype = (
             model_args.torch_dtype
             if model_args.torch_dtype in ["auto", None]
             else getattr(torch, model_args.torch_dtype)
         )
-        model = AutoModelForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
-            from_tf=bool(".ckpt" in model_args.model_name_or_path),
-            config=config,
-            cache_dir=model_args.cache_dir,
-            revision=model_args.model_revision,
-            use_auth_token=True if model_args.use_auth_token else None,
-            torch_dtype=torch_dtype,
-            low_cpu_mem_usage=model_args.low_cpu_mem_usage,
+        if False:
+            from llama_zh.model.modeling_llama import LlamaForCausalLM
+            model = LlamaForCausalLM(config=config)
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_args.model_name_or_path,
+                from_tf=bool(".ckpt" in model_args.model_name_or_path),
+                config=config,
+                cache_dir=model_args.cache_dir,
+                revision=model_args.model_revision,
+                use_auth_token=True if model_args.use_auth_token else None,
+                torch_dtype=torch_dtype,
+                low_cpu_mem_usage=model_args.low_cpu_mem_usage,
+                trust_remote_code=True,
         )
     else:
         model = AutoModelForCausalLM.from_config(config)
@@ -459,22 +431,12 @@ def main():
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.
     embedding_size = model.get_input_embeddings().weight.shape[0]
+    tokenizer_len = len(tokenizer)
     if len(tokenizer) > embedding_size:
         model.resize_token_embeddings(len(tokenizer))
 
     # since this will be pickled to avoid _LazyModule error in Hasher force logger loading before tokenize_function
     tok_logger = transformers.utils.logging.get_logger("transformers.tokenization_utils_base")
-
-    def tokenize_function(examples):
-        with CaptureLogger(tok_logger) as cl:
-            output = tokenizer(examples[text_column_name])
-        # clm input could be much much longer than block_size
-        if "Token indices sequence length is longer than the" in cl.out:
-            tok_logger.warning(
-                "^^^^^^^^^^^^^^^^ Please ignore the warning above - this long input will be chunked into smaller bits"
-                " before being passed to the model."
-            )
-        return output
 
     if data_args.block_size is None:
         block_size = tokenizer.model_max_length
@@ -493,47 +455,6 @@ def main():
             )
         block_size = min(data_args.block_size, tokenizer.model_max_length)
 
-    # Main data processing function that will concatenate all texts from our dataset and generate chunks of block_size.
-    def group_texts(examples):
-        # Concatenate all texts.
-        concatenated_examples = {k: list(chain(*examples[k])) for k in examples.keys()}
-        total_length = len(concatenated_examples[list(examples.keys())[0]])
-        # We drop the small remainder, and if the total_length < block_size  we exclude this batch and return an empty dict.
-        # We could add padding if the model supported it instead of this drop, you can customize this part to your needs.
-        total_length = (total_length // block_size) * block_size
-        # Split by chunks of max_len.
-        result = {
-            k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
-            for k, t in concatenated_examples.items()
-        }
-        result["labels"] = result["input_ids"].copy()
-        return result
-
-    # Note that with `batched=True`, this map processes 1,000 texts together, so group_texts throws away a remainder
-    # for each of those groups of 1,000 texts. You can adjust that batch_size here but a higher value might be slower
-    # to preprocess.
-    #
-    # To speed up this part, we use multiprocessing. See the documentation of the map method for more information:
-    # https://huggingface.co/docs/datasets/package_reference/main_classes.html#datasets.Dataset.map
-
-    with training_args.main_process_first(desc="grouping texts together"):
-        def preprocess_logits_for_metrics(logits, labels):
-            if isinstance(logits, tuple):
-                # Depending on the model and config, logits may contain extra tensors,
-                # like past_key_values, but logits always come first
-                logits = logits[0]
-            return logits.argmax(dim=-1)
-
-        metric = evaluate.load("accuracy")
-
-        def compute_metrics(eval_preds):
-            preds, labels = eval_preds
-            # preds have the same shape as the labels, after the argmax(-1) has been calculated
-            # by preprocess_logits_for_metrics but we need to shift the labels
-            labels = labels[:, 1:].reshape(-1)
-            preds = preds[:, :-1].reshape(-1)
-            return metric.compute(predictions=preds, references=labels)
-
     # Initialize our Trainer
     trainer = Trainer(
         model=model,
@@ -542,11 +463,7 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=tokenizer,
         # Data collator will default to DataCollatorWithPadding, so we change it.
-        data_collator=default_data_collator,
-        compute_metrics=compute_metrics if training_args.do_eval and not is_torch_tpu_available() else None,
-        preprocess_logits_for_metrics=preprocess_logits_for_metrics
-        if training_args.do_eval and not is_torch_tpu_available()
-        else None,
+        data_collator=data_collator,
     )
 
     # Training
@@ -608,6 +525,4 @@ def _mp_fn(index):
 
 
 if __name__ == "__main__":
-    # import deepspeed
-    # deepspeed.ops.op_builder.CPUAdamBuilder().load()
     main()

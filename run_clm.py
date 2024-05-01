@@ -429,18 +429,21 @@ def main():
             if model_args.torch_dtype in ["auto", None]
             else getattr(torch, model_args.torch_dtype)
         )
-        from llama_zh.model.modeling_llama import LlamaForCausalLM
-        model = LlamaForCausalLM(config=config)
-        # model = AutoModelForCausalLM.from_pretrained(
-        #     model_args.model_name_or_path,
-        #     from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        #     config=config,
-        #     cache_dir=model_args.cache_dir,
-        #     revision=model_args.model_revision,
-        #     use_auth_token=True if model_args.use_auth_token else None,
-        #     torch_dtype=torch_dtype,
-        #     low_cpu_mem_usage=model_args.low_cpu_mem_usage,
-        # )
+        if True:
+            from llama_zh.model.modeling_llama import LlamaForCausalLM
+            model = LlamaForCausalLM(config=config)
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_args.model_name_or_path,
+                from_tf=bool(".ckpt" in model_args.model_name_or_path),
+                config=config,
+                cache_dir=model_args.cache_dir,
+                revision=model_args.model_revision,
+                use_auth_token=True if model_args.use_auth_token else None,
+                torch_dtype=torch_dtype,
+                low_cpu_mem_usage=model_args.low_cpu_mem_usage,
+                trust_remote_code=True,
+        )
     else:
         model = AutoModelForCausalLM.from_config(config)
         n_params = sum({p.data_ptr(): p.numel() for p in model.parameters()}.values())
@@ -449,7 +452,6 @@ def main():
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.
     embedding_size = model.get_input_embeddings().weight.shape[0]
-    tokenizer_len = len(tokenizer)
     if len(tokenizer) > embedding_size:
         model.resize_token_embeddings(len(tokenizer))
 
