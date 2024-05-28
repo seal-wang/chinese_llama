@@ -12,6 +12,16 @@ def main():
     model = LlamaForCausalLM.from_pretrained(checkpoint_path).to(device)
     tokenizer = LlamaZHTokenizer.from_pretrained(checkpoint_path)
 
+    config_dict = {
+        "temperature": 0.5,
+        "do_sample": False,
+        "top_k": 20,
+        "top_p": 0.5,
+        "num_beams": 1,
+        "repetition_penalty": 1.4,
+        "max_new_tokens": 300
+    }
+    
     gen_config = GenerationConfig(
         max_length=10,
         temperature=0.3,
