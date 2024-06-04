@@ -20,14 +20,14 @@
     "overwrite_output_dir": true,
     "num_train_epochs": 4,
     "gradient_checkpointing": true,
-    "fp16": false,
-    "torch_dtype": "float32",
+    "fp16": true,
+    "torch_dtype": "float16",
     "max_grad_norm": 0,
     "preprocessing_num_workers": 1,
     "no_cuda": false,
     "from_scratch": true,
-	"lora_rank": 2,
-	"lora_alpha": 32,
-	"lora_dropout": 0.05,
-	"trainable": "q_proj,v_proj,k_proj,o_proj,gate_proj,down_proj,up_proj"	
+    "lora_rank": 4,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "trainable": "q_proj,v_proj,k_proj,o_proj,gate_proj,down_proj,up_proj"	
 }
