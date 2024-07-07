@@ -164,7 +164,7 @@ def edit_tok_model(input_file, output_file, add_file):
         f.write(new_str)
 
 def parse_args():
-    parser = argparse.ArgumentParser(description = 'pack hot update res')
+    parser = argparse.ArgumentParser(description = 'strip token model')
     parser.add_argument('-i', '--input_file', type = str, required = True, metavar = '', help = 'input file')
     parser.add_argument('-o', '--output_file', type = str, required = True, metavar = '', help = 'output file')
     parser.add_argument('-a', '--add_file', type = str, metavar = '', help = 'add file')
