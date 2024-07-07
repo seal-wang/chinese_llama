@@ -43,7 +43,7 @@ def main():
         tokens = tokenizer(text)
         input_ids = torch.LongTensor([tokens.input_ids]).to(device)
         outputs = model.generate(inputs=input_ids, generation_config=gen_config)
-        outs = tokenizer.decode(outputs[0][input_ids.shape[-1]+2:])
+        outs = tokenizer.decode(outputs[0][input_ids.shape[-1]:])
         print("用户:", text)
         print("机器:", outs.rstrip(" <eop>"))
 
