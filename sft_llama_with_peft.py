@@ -494,21 +494,10 @@ def main():
             r=lora_rank, lora_alpha=lora_alpha,
             lora_dropout=lora_dropout,
             modules_to_save=modules_to_save)
-        print("lora_rank", lora_rank)
-        print("lora_alpha", lora_alpha)
-        print("target_modules", target_modules)
-        print("modules_to_save", modules_to_save)
-        # quit()
         model = get_peft_model(model, peft_config)
-
-    
 
     model.print_trainable_parameters()
     logger.info(f"model.modules_to_save: {model.modules_to_save}")
-    old_state_dict = model.state_dict
-    model.state_dict = (
-        lambda self, *_, **__: get_peft_model_state_dict(self, old_state_dict())
-    ).__get__(model, type(model))
 
     # Initialize our Trainer
     trainer = Trainer(
