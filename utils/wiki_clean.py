@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-主要用于解析wiki
-"""
+# ./wiki_clean.py -i zhwiki_file [zhwiki_file ...] -o out_path
 
 from gensim.corpora.wikicorpus import extract_pages,filter_wiki
 import bz2file
@@ -14,6 +11,7 @@ import argparse
 
 size_per_file = 5*(2**20)
 openCC = OpenCC('t2s')
+file_index = 0
 
 def match_chinese_variants(text):
     text = text.replace('-{}-', "")
@@ -230,30 +228,15 @@ def wiki_replace(d):
     s = match_string(s)
     return s
 
-def test_fun():
-    with open("/home/yin/work/other/test/pp_data/wiki_data/tmp_file.txt", mode='r') as f:
-        s = f.read()
-    
-    s, ret_str = parse_date(s)
-
-    with open("/home/yin/work/other/test/pp_data/wiki_data/tmp_file.txt", mode='a') as f:
-        f.write("\n\n\n" + s)
-    quit()
-
 def wiki_process(input_file,save_path):
-    # wikicorpus解析
+    global file_index
     wiki = extract_pages(bz2file.open(input_file))
-    # 处理并导出
     article_num = 0
     file_len = 0
     file_cache = ''
-    file_index = 0
     f = codecs.open(save_path + f"parse_00000.txt", 'w', encoding='utf-8')
     w = tqdm(wiki, desc=u'')
     for d in w:
-        # wiki_replace(d)
-        # get_title(d)
-        # continue 
         if not re.findall('^[a-zA-Z]+:', d[0]) and d[0] and not re.findall(u'^#', d[1]) and '年表' not in d[0]:
             s = '=====' + openCC.convert(d[0]) + '=====\n'+ wiki_replace(d) +'\n\n\n\n'
             file_len += len(s.encode('utf-8'))
@@ -270,16 +253,18 @@ def wiki_process(input_file,save_path):
     if len(file_cache) > 0:
         f.write(file_cache)
         f.close()
+        file_index += 1
   
 def parse_args():
     parser = argparse.ArgumentParser(description = 'clean wiki corpus')
-    parser.add_argument('-i', '--input_file', type = str, required = True, nargs = '+', metavar = '', default = [], help = 'input file')
-    parser.add_argument('-o', '--output_file', type = str, required = True, metavar = '', help = 'output file')
+    parser.add_argument('-i', '--input_files', type = str, required = True, nargs = '+', metavar = '', default = [], help = 'input files')
+    parser.add_argument('-o', '--output_path', type = str, required = True, metavar = '', help = 'output path')
     args = parser.parse_args()
 
     return args
 
 if __name__ == '__main__':
     args = parse_args()
-    for input_file in args.input_file:
-        wiki_process(input_file, args.output_file)
+    for input_file in args.input_files:
+        print(input_file)
+        wiki_process(input_file, args.output_path)
