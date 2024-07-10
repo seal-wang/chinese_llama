@@ -1,4 +1,3 @@
-#!/home/yin/local_bin/miniconda3/envs/env_py310/bin/python3
 # merge_lora.py -b base_path -l lora_path -o output_path
 from transformers import AutoModelForCausalLM
 from peft import PeftModel
