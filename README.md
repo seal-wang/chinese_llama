@@ -44,7 +44,7 @@ Created by seadog-www
    - 通用模型（common base model），其训练语料仅包含通用百科语料（中文维基百科+百度百科）；
    - 是医学模型（medical base model），其训练语料包含通用百科语料和医学领域语料（中文维基百科+百度百科+中文医疗数据集）
 	```bash
-	./run_clm.sh | tee train.log
+	./run_pt.sh | tee train.log
 	```
    
 ## 💡SFT指令微调
