@@ -6,12 +6,26 @@
     "configurations": [
         {
             "python": "${userHome}/local_bin/miniconda3/envs/env_py310/bin/python3",
-            "name": "python_debug",
+            "name": "sft",
             "type": "debugpy",
             "request": "launch",
             "program": "sft_llama.py",
             "console": "integratedTerminal",
             "args": ["run_config.json"],
+            "env": {
+                "PYTHONPATH": "${userHome}/local_bin/miniconda3/envs/env_py310/lib/python3.10/site-packages/",
+                "PATH": "${userHome}/local_bin/miniconda3/envs/env_py310/bin:${env:PATH}"
+            },
+            "justMyCode": false
+        },
+        {
+            "python": "${userHome}/local_bin/miniconda3/envs/env_py310/bin/python3",
+            "name": "sft_with_peft",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "sft_llama_with_peft.py",
+            "console": "integratedTerminal",
+            "args": ["sft_with_peft_config.json"],
             "env": {
                 "PYTHONPATH": "${userHome}/local_bin/miniconda3/envs/env_py310/lib/python3.10/site-packages/",
                 "PATH": "${userHome}/local_bin/miniconda3/envs/env_py310/bin:${env:PATH}"
