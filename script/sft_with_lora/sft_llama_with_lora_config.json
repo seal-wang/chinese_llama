@@ -25,7 +25,7 @@
     "max_grad_norm": 0,
     "preprocessing_num_workers": 1,
     "no_cuda": false,
-    "deepspeed": "ds_zero2_no_offload.json",
+    "deepspeed": "./script/ds_zero0_no_offload.json",
     "from_scratch": true,
     "lora_rank": 16,
     "lora_alpha": 32,
