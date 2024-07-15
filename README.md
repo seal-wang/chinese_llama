@@ -22,7 +22,7 @@ Created by seal-wang
    - 本项目模型参数较小，如果vocab_size太大，势必会造成embedding部分占据参数量的很大比例，造成Attention和FFN部分参数不足，从而影响模型表现；
    - 预训练的语料主要是中文文本，而chatGLM的分词模型中包含了除中文字符以外的很多其他字符，如英语、阿拉伯语、希伯来语等；
    需要对chatGLM的分词模型进行裁剪，保留全部中文、一小部分英文和其他符号，裁剪后的分词模型包含了35023个token。
-   执行脚本[strip_token_model.py](https://github.com/seadog-www/chinese_llama/blob/main/utils/strip_token_model.py)裁剪分词模型
+   执行脚本[strip_token_model.py](https://github.com/seal-wang/chinese_llama/blob/dev_bran/utils/strip_token_model.py)裁剪分词模型
    ```bash
    # retain_en.txt包含需要保留或添加的英文tokens
    ./strip_token_model.py -i old_token.model -o new_token.model -a retain_en.txt
