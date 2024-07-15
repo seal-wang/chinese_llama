@@ -69,7 +69,7 @@ LLM微调的目的是让模型能够按我们预想的方式来整合其蕴含�
 
 3. **合并lora权重**
 
-	执行脚本[merge_lora.py](https://github.com/seadog-www/chinese_llama/blob/main/utils/merge_lora.py)，合并lora权重到base模型
+	执行脚本[merge_lora.py](https://github.com/seal-wang/chinese_llama/blob/dev_bran/utils/merge_lora.py)，合并lora权重到base模型
 	```bash
 	python merge_lora.py -b base_path -l lora_path -o output_path
 	```
