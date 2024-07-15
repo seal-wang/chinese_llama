@@ -12,7 +12,7 @@ Created by seal-wang
 2. **语料处理**
 
    中文维基百科语料比较原始，包含了很多于训练无益的符号、标签以及引用等内容，因此需要进行清洗，gensim库的wikicorpus模块是可以用来清洗wiki语料的，wikicorpus主要是通过正则表达式来对文档进行处理，由于文档中存在嵌套的结构，因此实际处理后还是会存在一些问题，如人物的生卒年月被删除、引用和文件等信息残留。因此，需要结合wikicorpus进一步完善数据的清洗。
-   执行脚本[wiki_clean.py](https://github.com/seadog-www/chinese_llama/blob/main/utils/wiki_clean.py)清洗wiki语料
+   执行脚本[wiki_clean.py](https://github.com/seal-wang/chinese_llama/blob/dev_bran/utils/wiki_clean.py)清洗wiki语料
    ```bash
    ./wiki_clean.py -i zhwiki_file [zhwiki_file ...] -o out_path
    ```
